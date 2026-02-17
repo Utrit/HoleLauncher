@@ -3,18 +3,47 @@
         xmlns:vm="using:HoleLauncher.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="200"
+        Width="400"
+        Height="200"
         x:Class="HoleLauncher.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="HoleLauncher">
+        Background="#383838"
+        CanResize="False"
+        Title="HoleLauncher"
+        Margin="0"
+        Padding="0">
 
     <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    <Panel Margin="0">
+        <Panel HorizontalAlignment="Stretch" VerticalAlignment="Top">
+            <StackPanel Margin="0 0" Background="Black" Height="20" VerticalAlignment="Top">
+                <TextBlock Text="HoleLauncher" Foreground="Azure" FontFamily="{StaticResource SnProMedium}" Margin="5 0 0 0"></TextBlock>
+            </StackPanel>            
+            <StackPanel Margin="5 20" >
+                <WrapPanel>
+                    <TextBox Margin="0 5" AcceptsReturn="True" Text = "{Binding UserName}" Watermark="Enter Username" Width="100" HorizontalAlignment="Left" FontSize="10" FontFamily="{StaticResource SnProMedium}"></TextBox>
+                    <TextBox Margin="0 5" AcceptsReturn="True" Text = "{Binding BackendAddress}" Watermark="Enter Address" Width="100" HorizontalAlignment="Left" FontSize="10" FontFamily="{StaticResource SnProMedium}"></TextBox>
+                </WrapPanel>
+                <ComboBox Width="200"
+                          ItemsSource="{Binding Instances}"
+                          SelectedItem="{Binding SelectedInstance}"
+                          PlaceholderText="{Binding SelectedInstance}" />
+            </StackPanel>
+        </Panel>
+        <StackPanel VerticalAlignment="Bottom">
+            <WrapPanel>
+                <Button Command="{Binding OnStartGame}" Content="Start" Margin="5 15, 0, 0" VerticalContentAlignment="Center" Foreground="Azure"/>
+                <Button Command="{Binding OnIntegrityCheck}" Content="OnlyMods" Margin="5 15, 0, 0" VerticalContentAlignment="Center" Foreground="Azure"/>
+            </WrapPanel>
+            <TextBlock Text="{Binding FileName}" HorizontalAlignment="Stretch" TextAlignment="Left" Margin="5 5 5 0" Foreground="Azure"></TextBlock>
+            <ProgressBar VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Foreground="Teal" Minimum="0" Maximum="100" Value="{Binding Progress}" Height="20" Margin=" 5 5 5 5"></ProgressBar>
+        </StackPanel>
+
+    </Panel>
 
 </Window>

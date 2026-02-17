@@ -12,4 +12,8 @@
     <Application.Styles>
         <FluentTheme />
     </Application.Styles>
+             
+    <Application.Resources>
+        <FontFamily x:Key="SnProMedium">avares://HoleLauncher/Assets/Fonts/SNPro-Medium.ttf#Sn Pro Medium</FontFamily>
+    </Application.Resources>
 </Application>

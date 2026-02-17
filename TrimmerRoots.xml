@@ -1,0 +1,5 @@
+﻿<linker>
+    <assembly fullname="HoleLauncher">
+        <type fullname="HoleLauncher.ViewModels*" preserve="all"/>
+    </assembly>
+</linker>

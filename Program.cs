@@ -1,5 +1,10 @@
 ﻿using Avalonia;
 using System;
+using HoleLauncher.Core.Launcher;
+using HoleLauncher.Core.Services;
+using ReactiveUI;
+using ReactiveUI.Avalonia;
+using Splat;
 
 namespace HoleLauncher;
 
@@ -17,5 +22,11 @@ sealed class Program
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
             .WithInterFont()
-            .LogToTrace();
+            .LogToTrace()
+            .UseReactiveUI(factory =>
+            {
+                Locator.CurrentMutable.RegisterLazySingleton(() => new MessageBus(), typeof(IMessageBus));
+                Locator.CurrentMutable.Register(()=> new DataProvider(), typeof(IDataProvider));
+                Locator.CurrentMutable.RegisterConstant(new LauncherCore(), typeof(ILauncherCore));
+            });
 }

@@ -4,8 +4,11 @@ using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
 using System.Linq;
 using Avalonia.Markup.Xaml;
+using HoleLauncher.Core.DTO;
 using HoleLauncher.ViewModels;
 using HoleLauncher.Views;
+using ReactiveUI;
+using Splat;
 
 namespace HoleLauncher;
 
@@ -29,6 +32,7 @@ public partial class App : Application
             };
         }
 
+        Locator.Current.GetService<IMessageBus>()?.SendMessage(new OnAppInited(), "Init");
         base.OnFrameworkInitializationCompleted();
     }
 
