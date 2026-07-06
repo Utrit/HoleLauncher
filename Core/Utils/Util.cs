@@ -22,7 +22,11 @@ public static class Util
     {
         using var client = new HttpClient();
         using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        if (response.StatusCode != HttpStatusCode.OK)
+        {
+            return;
+        }
+        
         await using var inputStream = await response.Content.ReadAsStreamAsync(cancellationToken);
         await using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None);
         await inputStream.CopyToAsync(fileStream, cancellationToken);

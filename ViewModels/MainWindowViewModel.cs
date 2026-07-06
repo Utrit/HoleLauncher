@@ -78,7 +78,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public string SelectedInstance {
         get => _selectedUser.SelectedInstance;
         set {
-            if (_selectedUser.SelectedInstance != value)
+            if (_selectedUser.SelectedInstance != value && value is not null)
             {
                 _selectedUser.SelectedInstance = value;
                 _messageBus?.SendMessage(_selectedUser, "Updated User");
@@ -105,6 +105,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         FileName = data.FileName;
         Progress = data.PercentComplete;
+        Console.WriteLine($"Progress: {data.PercentComplete}% of {data.FileName}");
     }
     
     private void OnUserUpdated(UserDTO? user)

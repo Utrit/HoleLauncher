@@ -26,6 +26,7 @@ public class LauncherCore : ILauncherCore
     private UserDTO? _user;
     private bool _isRunning;
     private bool _isRunningMods;
+    private int _currentLoading;
     private List<InstanceManifest>? _loadedManifests = new();
     
     public LauncherCore()
@@ -55,12 +56,9 @@ public class LauncherCore : ILauncherCore
     private async Task UpdateUserUI(UserDTO user)
     {
         _user = user;
-        if (_user.BackendAddress != string.Empty)
-        {
-            _loadedManifests = await Util.DownloadJsonAsync<List<InstanceManifest>>($"http://{_user.BackendAddress}/instances");
-            if (_loadedManifests != null)
-                _messageBus?.SendMessage(new ManifestInfo(_loadedManifests), "Updated InstanceUI");
-        }
+        _loadedManifests = await Util.DownloadJsonAsync<List<InstanceManifest>>($"http://{_user?.BackendAddress}/instances");
+        if (_loadedManifests != null)
+            _messageBus?.SendMessage(new ManifestInfo(_loadedManifests), "Updated InstanceUI");
     }
     
     
@@ -167,10 +165,10 @@ public class LauncherCore : ILauncherCore
         var instancePath = $"./data/{manifest.InstanceName}";
         var tasks = manifest.Mods.Select(async manifestMod =>
         {
-            if (await ValidateMod(manifestMod, instancePath)) return null;
-            return InstallMod(manifestMod, instancePath, manifest);
+            if (await ValidateMod(manifestMod, instancePath)) return false;
+            return await InstallMod(manifestMod, instancePath, manifest);
         });
-        await Task.WhenAll(tasks);
+        var res = await Task.WhenAll(tasks);
         return manifest;
     }
     
@@ -179,23 +177,28 @@ public class LauncherCore : ILauncherCore
         _messageBus?.SendMessage(new ProgressInfo(info, progress), "Updated FileUI");
     }
     
-    private async Task InstallMod(ModEntry mod, string installPath, InstanceManifest manifest)
+    private async Task<bool> InstallMod(ModEntry mod, string installPath, InstanceManifest manifest)
     {
+        while (_currentLoading > 5)
+        {
+            await Task.Delay(100);
+        }
+        _currentLoading++;
         using var client = new WebClient();
         Directory.CreateDirectory($"{installPath}{mod.ModPath}/");
         var fileName = $"{installPath}{mod.ModPath}/{mod.ModName}";
-        await Util.DownloadFileAsync(HandleBackendLink(mod, manifest), fileName);
         SendInfo($"Install:{mod.ModName}", 0f);
+        await Util.DownloadFileAsync(HandleBackendLink(mod, manifest), fileName);
+        SendInfo($"Installed:{mod.ModName}", 100f);
+        _currentLoading--;
+        return true;
     }
 
     private string HandleBackendLink(ModEntry entry, InstanceManifest manifest)
     {
-        if (entry.ModLink.StartsWith("[BACKEND]:."))
-        {
-            var removed = entry.ModLink.Remove(0, "[BACKEND]:.".Length);
-            return $"http://{_user.BackendAddress}/loadcontent?id={manifest.InstanceId}&filePath=.{removed}";
-        }
-        return entry.ModLink;
+        if (!entry.ModLink.StartsWith("[BACKEND]:.")) return entry.ModLink;
+        var removed = entry.ModLink.Remove(0, "[BACKEND]:.".Length);
+        return $"http://{_user?.BackendAddress}/loadcontent?id={manifest.InstanceId}&filePath=.{removed}";
     }
     
     private async Task<bool> ValidateMod(ModEntry mod, string installPath)
@@ -203,7 +206,6 @@ public class LauncherCore : ILauncherCore
         var fileName = $"{installPath}{mod.ModPath}/{mod.ModName}";
         if (!File.Exists(fileName)) return false;
         if (mod.ModType == ModType.Soft || mod.ModType == ModType.Optional) return true;
-        var t = await Util.GetFileSHA(fileName);
         return mod.ModSHA512 == await Util.GetFileSHA(fileName);
     }
 }
