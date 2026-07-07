@@ -34,11 +34,42 @@
                           SelectedItem="{Binding SelectedInstance}"
                           PlaceholderText="{Binding SelectedInstance}" />
             </StackPanel>
+            <ListBox ItemsSource="{Binding Optional}" Width="175" SelectionMode="Single" HorizontalAlignment="Right" Margin="5 25" MaxHeight="130">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <CheckBox Content="{Binding Name}"
+                                  IsChecked="{Binding IsChecked}"
+                                  IsEnabled="{Binding CanChange}"
+                                  Height="25"
+                                  />
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+                
+                <ListBox.Styles>
+                    <Style Selector="ListBoxItem">
+                        <Setter Property="Padding" Value="1" />
+                    </Style>
+                    <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                        <Setter Property="Background" Value="#909090" />
+                    </Style>
+
+                    <Style Selector="ListBoxItem:nth-child(odd)">
+                        <Setter Property="Background" Value="#808080"/>
+                    </Style>
+                    <Style Selector="ListBoxItem:nth-child(even)">
+                        <Setter Property="Background" Value="#606060"/>
+                    </Style>
+                    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                        <Setter Property="Background" Value="#909090" />
+                    </Style>
+                </ListBox.Styles>
+            </ListBox> 
         </Panel>
         <StackPanel VerticalAlignment="Bottom">
             <WrapPanel>
                 <Button Command="{Binding OnStartGame}" Content="Start" Margin="5 15, 0, 0" VerticalContentAlignment="Center" Foreground="Azure"/>
                 <Button Command="{Binding OnIntegrityCheck}" Content="OnlyMods" Margin="5 15, 0, 0" VerticalContentAlignment="Center" Foreground="Azure"/>
+                <TextBox Margin="5 5" AcceptsReturn="True" Text = "{Binding RamAmount}" Watermark="RAM" Width="50" HorizontalAlignment="Left" FontSize="10" FontFamily="{StaticResource SnProMedium}"></TextBox>
             </WrapPanel>
             <TextBlock Text="{Binding FileName}" HorizontalAlignment="Stretch" TextAlignment="Left" Margin="5 5 5 0" Foreground="Azure"></TextBlock>
             <ProgressBar VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Foreground="Teal" Minimum="0" Maximum="100" Value="{Binding Progress}" Height="20" Margin=" 5 5 5 5"></ProgressBar>

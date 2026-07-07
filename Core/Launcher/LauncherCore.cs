@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Threading.Tasks;
 using CmlLib.Core;
 using CmlLib.Core.Auth;
 using CmlLib.Core.Installer.Forge;
+using CmlLib.Core.Installer.NeoForge;
+using CmlLib.Core.Installer.NeoForge.Installers;
 using CmlLib.Core.Installers;
 using CmlLib.Core.ProcessBuilder;
 using HoleLauncher.Core.DTO;
@@ -28,6 +28,7 @@ public class LauncherCore : ILauncherCore
     private bool _isRunningMods;
     private int _currentLoading;
     private List<InstanceManifest>? _loadedManifests = new();
+    private HashSet<ModEntry> _activeOptionalMods = new();
     
     public LauncherCore()
     {
@@ -38,8 +39,49 @@ public class LauncherCore : ILauncherCore
         _messageBus?
             .Listen<OnAppInited>("Init")
             .Subscribe(OnInit);
+        _messageBus?
+            .Listen<OptionModSelect>("OptionModSelect")
+            .Subscribe(OnOptionalModSelect);
     }
 
+    private void OnOptionalModSelect(OptionModSelect obj)
+    {
+        if (!obj.Status)
+        {
+            TryDisableMod(obj.ModEntry);
+            return;
+        }
+
+        if (_activeOptionalMods.Any(x=>x.ModSlug == obj.ModEntry.ModSlug))
+        {
+            return;
+        }
+        
+        _activeOptionalMods.Add(obj.ModEntry);
+        foreach (var dep in obj.ModEntry.ModDepend)
+        {
+            _messageBus?.SendMessage(new OptionModUIUpdate(dep, obj.Status), "OptionModUIUpdate");
+        }
+    }
+
+    private void TryDisableMod(ModEntry modEntry)
+    {
+        var hasActiveParent = _activeOptionalMods.FirstOrDefault(x => x.ModDepend.Any(y => y == modEntry.ModSlug));
+        if (hasActiveParent.ModName is not null)
+        {
+            return;
+        }
+
+        _activeOptionalMods.RemoveWhere(x=> x.ModSlug == modEntry.ModSlug);
+        _messageBus?.SendMessage(new OptionModUIUpdate(modEntry.ModSlug, false), "OptionModUIUpdate");
+        foreach (var dep in modEntry.ModDepend)
+        {
+            var mod = _activeOptionalMods.FirstOrDefault(x => x.ModSlug == dep);
+            if (mod.ModName is null) continue;
+            TryDisableMod(mod);
+        }
+    }
+    
     private void OnInit(OnAppInited data)
     {
         _dataProvider = Locator.Current.GetService<IDataProvider>();
@@ -71,15 +113,16 @@ public class LauncherCore : ILauncherCore
         _isRunningMods = true;
         SendInfo("Start Mods checking", 0f);
         _loadedManifests = await Util.DownloadJsonAsync<List<InstanceManifest>>($"http://{_user.BackendAddress}/instances");
-        var currManifest = _dataProvider?.Load<InstanceManifest>();
+        var manifestPath = $"./data/{_user.SelectedInstance.Split("/")[1]}/InstanceManifest.json";
+        var currManifest = _dataProvider?.Load<InstanceManifest>(manifestPath);
         var remoteManifest = _loadedManifests.FirstOrDefault(x => $"{x.InstanceId}/{x.InstanceName}".Equals(_user.SelectedInstance));
         var res = await SetupMods(currManifest, remoteManifest);
         SendInfo("Finish Mods checking", 100f);
-        _dataProvider?.Save(res);
+        _dataProvider?.Save(res, manifestPath);
         _isRunningMods = false;
         return res;
     }
-    
+
     public async Task StartGame()
     {
         if (_isRunning || _isRunningMods)
@@ -94,27 +137,39 @@ public class LauncherCore : ILauncherCore
         var path = new MinecraftPath(instancePath);
         var launcher = new MinecraftLauncher(path);
         var forgeInstaller = new ForgeInstaller(launcher);
-        
+        var neoForgeInstaller = new NeoForgeInstaller(launcher);
+
         var fileProgress = new Progress<InstallerProgressChangedEventArgs>(e => name = e.Name);
         var byteProgress = new Progress<ByteProgress>(e => SendInfo(name, (float)e.ToRatio() * 100f));
-        
-        var versionName = await forgeInstaller.Install(currManifest.InstanceMCVersion, currManifest.InstanceForgeVersion, new ForgeInstallOptions
+        var versionName = "";
+
+        if (currManifest.InstanceForgeVersion is not null)
         {
-            FileProgress = fileProgress,
-            ByteProgress = byteProgress,
-            InstallerOutput = new Progress<string>(e => name = e),
-        });
+            versionName = await forgeInstaller.Install(currManifest.InstanceMCVersion, currManifest.InstanceForgeVersion, new ForgeInstallOptions
+            {
+                FileProgress = fileProgress,
+                ByteProgress = byteProgress,
+                InstallerOutput = new Progress<string>(e => name = e),
+            });
+        }
+        else
+        {
+            versionName = await neoForgeInstaller.Install(currManifest.InstanceMCVersion, currManifest.InstanceNeoForgeVersion, new NeoForgeInstallOptions
+            {
+                FileProgress = fileProgress,
+                ByteProgress = byteProgress,
+                InstallerOutput = new Progress<string>(e => name = e),
+            });
+        }
 
         await launcher.InstallAsync(versionName, fileProgress, byteProgress);
         SendInfo("Complete!", 0f);
         
         var launchOption = new MLaunchOption
         {
-            MaximumRamMb = 4096,
+            MaximumRamMb = Math.Clamp(int.Parse(_user.RamAmount), 1024, int.MaxValue),
             Session = MSession.CreateOfflineSession(_user.Username),
         };
-
-
 
         SendInfo("Launch", 0f);
         var process = await launcher.BuildProcessAsync(versionName, launchOption);
@@ -143,7 +198,15 @@ public class LauncherCore : ILauncherCore
                 continue;
             }
 
-            if (remoteMod.ModVersion == currManifestMod.ModVersion) continue;
+            var manifestModActive = currManifest.SelectedMods.Any(x => x == currManifestMod.ModSlug);
+            var optionalModActive = _activeOptionalMods.Any(x=>x.ModSlug == currManifestMod.ModSlug);
+            if (manifestModActive && !optionalModActive)
+            {
+                hasChanges = true;
+                handles.Add(new RemoveModsHandle(currManifestMod, $"./data/{currManifest.InstanceName}"));
+                continue;
+            }
+            if (remoteMod.ModVersion == currManifestMod.ModVersion && !optionalModActive) continue;
             hasChanges = true;
             handles.Add(new RemoveModsHandle(remoteMod, $"./data/{currManifest.InstanceName}"));
         }
@@ -162,6 +225,8 @@ public class LauncherCore : ILauncherCore
             }
             manifest = remoteManifest;
         }
+
+        manifest.SelectedMods = _activeOptionalMods.Select(x => x.ModSlug).ToList();
         var instancePath = $"./data/{manifest.InstanceName}";
         var tasks = manifest.Mods.Select(async manifestMod =>
         {
@@ -179,12 +244,12 @@ public class LauncherCore : ILauncherCore
     
     private async Task<bool> InstallMod(ModEntry mod, string installPath, InstanceManifest manifest)
     {
+        
         while (_currentLoading > 5)
         {
             await Task.Delay(100);
         }
         _currentLoading++;
-        using var client = new WebClient();
         Directory.CreateDirectory($"{installPath}{mod.ModPath}/");
         var fileName = $"{installPath}{mod.ModPath}/{mod.ModName}";
         SendInfo($"Install:{mod.ModName}", 0f);
@@ -204,6 +269,7 @@ public class LauncherCore : ILauncherCore
     private async Task<bool> ValidateMod(ModEntry mod, string installPath)
     {
         var fileName = $"{installPath}{mod.ModPath}/{mod.ModName}";
+        if (mod.ModType == ModType.Optional && _activeOptionalMods.All(x => x.ModSlug != mod.ModSlug)) return true;
         if (!File.Exists(fileName)) return false;
         if (mod.ModType == ModType.Soft || mod.ModType == ModType.Optional) return true;
         return mod.ModSHA512 == await Util.GetFileSHA(fileName);
