@@ -168,6 +168,7 @@ public partial class MainWindowViewModel : ViewModelBase
         UserName = user.Username;
         BackendAddress = user.BackendAddress;
         SelectedInstance = user.SelectedInstance;
+        RamAmount = user.RamAmount;
     }
 
     public void OnStartGame()
