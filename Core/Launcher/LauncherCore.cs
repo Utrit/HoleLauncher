@@ -67,6 +67,7 @@ public class LauncherCore : ILauncherCore
 
     private void TryDisableMod(ModEntry modEntry)
     {
+        if (!_activeOptionalMods.Any(x=>x.ModSlug == modEntry.ModSlug)) return;
         var hasActiveParent = _activeOptionalMods.FirstOrDefault(x => x.ModDepend.Any(y => y == modEntry.ModSlug));
         if (hasActiveParent.ModName is not null)
         {
@@ -210,6 +211,11 @@ public class LauncherCore : ILauncherCore
             if (remoteMod.ModVersion == currManifestMod.ModVersion && !optionalModActive) continue;
             hasChanges = true;
             handles.Add(new RemoveModsHandle(remoteMod, $"./data/{currManifest.InstanceName}"));
+        }
+
+        if (currManifest.SelectedMods.Any(x => !_activeOptionalMods.Any(y => y.ModSlug == x)))
+        {
+            hasChanges = true;
         }
         
         return hasChanges;
