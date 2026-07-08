@@ -46,6 +46,7 @@ public class LauncherCore : ILauncherCore
 
     private void OnOptionalModSelect(OptionModSelect obj)
     {
+        if (obj.ModEntry.ModSlug is null) return;
         if (!obj.Status)
         {
             TryDisableMod(obj.ModEntry);
