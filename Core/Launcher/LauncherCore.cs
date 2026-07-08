@@ -268,6 +268,7 @@ public class LauncherCore : ILauncherCore
     
     private async Task<bool> ValidateMod(ModEntry mod, string installPath)
     {
+        if (mod.ModClientSide == "unsupported") return true;
         var fileName = $"{installPath}{mod.ModPath}/{mod.ModName}";
         if (mod.ModType == ModType.Optional && _activeOptionalMods.All(x => x.ModSlug != mod.ModSlug)) return true;
         if (!File.Exists(fileName)) return false;
