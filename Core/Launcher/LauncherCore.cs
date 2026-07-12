@@ -143,11 +143,13 @@ public class LauncherCore : ILauncherCore
 
         var fileProgress = new Progress<InstallerProgressChangedEventArgs>(e => name = e.Name);
         var byteProgress = new Progress<ByteProgress>(e => SendInfo(name, (float)e.ToRatio() * 100f));
-        var versionName = "";
+        Task<string> version;
+        string versionName = "";
 
         if (currManifest.InstanceForgeVersion is not null)
         {
-            versionName = await forgeInstaller.Install(currManifest.InstanceMCVersion, currManifest.InstanceForgeVersion, new ForgeInstallOptions
+            SendInfo($"Installing Forge:{currManifest.InstanceForgeVersion}",0f);
+            version = forgeInstaller.Install(currManifest.InstanceMCVersion, currManifest.InstanceForgeVersion, new ForgeInstallOptions
             {
                 FileProgress = fileProgress,
                 ByteProgress = byteProgress,
@@ -156,7 +158,8 @@ public class LauncherCore : ILauncherCore
         }
         else
         {
-            versionName = await neoForgeInstaller.Install(currManifest.InstanceMCVersion, currManifest.InstanceNeoForgeVersion, new NeoForgeInstallOptions
+            SendInfo($"Installing NeoForge:{currManifest.InstanceNeoForgeVersion}",0f);
+            version = neoForgeInstaller.Install(currManifest.InstanceMCVersion, currManifest.InstanceNeoForgeVersion, new NeoForgeInstallOptions
             {
                 FileProgress = fileProgress,
                 ByteProgress = byteProgress,
@@ -164,8 +167,29 @@ public class LauncherCore : ILauncherCore
             });
         }
 
-        await launcher.InstallAsync(versionName, fileProgress, byteProgress);
-        SendInfo("Complete!", 0f);
+        try
+        {
+            versionName = await version;
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            SendInfo(e.Message, 0f);
+            throw;
+        }
+        
+        SendInfo($"Installing MC: {currManifest.InstanceMCVersion}", 100f);
+        try
+        {
+            await launcher.InstallAsync(versionName, fileProgress, byteProgress);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            SendInfo(e.Message, 0f);
+            throw;
+        }
+        SendInfo("Complete!", 100f);
         
         var launchOption = new MLaunchOption
         {
@@ -200,7 +224,7 @@ public class LauncherCore : ILauncherCore
                 continue;
             }
 
-            var manifestModActive = currManifest.SelectedMods.Any(x => x == currManifestMod.ModSlug);
+            var manifestModActive = currManifest.SelectedMods.Any(x => x == currManifestMod.ModSlug );
             var optionalModActive = _activeOptionalMods.Any(x=>x.ModSlug == currManifestMod.ModSlug);
             if (manifestModActive && !optionalModActive)
             {
@@ -208,7 +232,7 @@ public class LauncherCore : ILauncherCore
                 handles.Add(new RemoveModsHandle(currManifestMod, $"./data/{currManifest.InstanceName}"));
                 continue;
             }
-            if (remoteMod.ModVersion == currManifestMod.ModVersion && !optionalModActive) continue;
+            if ((remoteMod.ModVersion == currManifestMod.ModVersion && !optionalModActive) || currManifestMod.ModType != ModType.Optional) continue;
             hasChanges = true;
             handles.Add(new RemoveModsHandle(remoteMod, $"./data/{currManifest.InstanceName}"));
         }
