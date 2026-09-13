@@ -127,7 +127,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void OnOptionModUpdated(OptionModUIUpdate obj)
     {
-        Optional.First(x => x.Name == obj.ModName).SetLocked(obj.Status);
+        Optional.FirstOrDefault(x => x.Name == obj.ModName)?.SetLocked(obj.Status);
     }
     
     private void OnManifestUpdated(ManifestInfo manifestInfo)
